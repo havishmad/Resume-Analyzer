@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analyzer for HR</title>
+    <!-- Include mammoth.js for DOCX parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #3498db;
+        }
+        .api-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .upload-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .analysis-section {
+            display: none;
+            margin-top: 30px;
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loader img {
+            width: 50px;
+            height: 50px;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .tag {
+            background-color: #e1f5fe;
+            color: #0288d1;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        #resumeText {
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        #errorMessage {
+            color: #e74c3c;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .file-upload-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .file-upload-container input[type="file"] {
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .file-upload-container .file-type-badge {
+            background-color: #3498db;
+            color: white;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 5px;
+        }
+        
+        .file-type-badge.docx {
+            background-color: #2980b9;
+        }
+        
+        .file-type-badge.txt {
+            background-color: #27ae60;
+        }
+        
+        .upload-icon {
+            margin-right: 8px;
+        }
+        .question {
+            background-color: #f0f9ff;
+            border-left: 4px solid #3498db;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+        }
+        .highlight {
+            padding: 8px;
+            margin-bottom: 8px;
+            background-color: #f1f8e9;
+            border-left: 3px solid #7cb342;
+            border-radius: 3px;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Resume Analyzer for HR</h1>
+<p style="text-align: center; margin-bottom: 20px;">Harness the power of AI to quickly analyze candidate resumes</p>
+        
+        <div class="api-section">
+            <h2>Step 1: Enter Your OpenAI API Key</h2>
+            <p>Your API key will only be used for this session and won't be stored.</p>
+            <input type="text" id="apiKey" placeholder="Enter your OpenAI API key here..." />
+            <small>Your key is stored locally and only sent to OpenAI for API requests</small>
+        </div>
+        
+        <div class="upload-section">
+            <h2>Step 2: Upload Resume</h2>
+            <p>Upload a resume to analyze (TXT or DOCX format)</p>
+            <div class="file-upload-container">
+                <input type="file" id="resumeFile" accept=".txt,.docx" />
+                <span id="fileTypeIndicator"></span>
+            </div>
+            <p><small>Note: The application supports both text files (.txt) and Word documents (.docx).</small></p>
+            <button id="analyzeBtn">Analyze Resume</button>
+            <button id="useSampleBtn" style="background-color: #2ecc71; margin-left: 10px;">Use Sample Resume</button>
+            <div id="errorMessage"></div>
+            <div class="loader">
+                <div class="spinner"></div>
+                <p>Analyzing resume... This may take a few moments.</p>
+            </div>
+        </div>
+        
+        <div id="extractedText" style="display: none;">
+            <h3>Extracted Text</h3>
+            <div id="resumeText"></div>
+        </div>
+        
+        <div id="analysisResults" class="analysis-section">
+            <h2>Resume Analysis Results</h2>
+            
+            <div class="card">
+                <h3>Candidate Summary</h3>
+                <p id="candidateSummary"></p>
+            </div>
+            
+            <div class="card">
+                <h3>Key Highlights</h3>
+                <div id="highlights"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Key Skills & Keywords</h3>
+                <div id="keywords" class="tag-container"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Recommended Interview Questions</h3>
+                <div id="questions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiKeyInput = document.getElementById('apiKey');
+            const resumeFileInput = document.getElementById('resumeFile');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const useSampleBtn = document.getElementById('useSampleBtn');
+            const loader = document.querySelector('.loader');
+            const analysisResults = document.getElementById('analysisResults');
+            const errorMessage = document.getElementById('errorMessage');
+            const extractedTextSection = document.getElementById('extractedText');
+            const resumeTextDiv = document.getElementById('resumeText');
+            
+            // Elements for displaying results
+            const candidateSummaryEl = document.getElementById('candidateSummary');
+            const highlightsEl = document.getElementById('highlights');
+            const keywordsEl = document.getElementById('keywords');
+            const questionsEl = document.getElementById('questions');
+            
+            // Sample resume text for demo purposes
+            const sampleResumeText = `
+JOHN SMITH
+Software Engineer
+john.smith@example.com | (555) 123-4567 | San Francisco, CA | linkedin.com/in/johnsmith
+
+SUMMARY
+Innovative software engineer with 5+ years of experience developing scalable web applications and microservices. Proficient in TypeScript, React, and Node.js. Passionate about clean code, performance optimization, and mentoring junior developers.
+
+SKILLS
+Languages: JavaScript, TypeScript, Python, Java, SQL
+Frontend: React, Redux, HTML5, CSS3, Tailwind CSS
+Backend: Node.js, Express, Spring Boot, Django
+Cloud: AWS (EC2, S3, Lambda), Azure, Docker, Kubernetes
+Databases: PostgreSQL, MongoDB, Redis
+Testing: Jest, Enzyme, Mocha, Chai
+Tools: Git, GitHub, JIRA, CI/CD, webpack
+
+EXPERIENCE
+Senior Software Engineer | TechInnovate Inc. | Jan 2020 - Present
+• Architected and implemented a serverless backend using AWS Lambda that reduced infrastructure costs by 35%
+• Led a team of 5 engineers to rebuild the customer dashboard using React and TypeScript, improving load times by 60%
+• Implemented event-driven architecture using AWS SNS/SQS that improved system reliability during high traffic periods
+• Mentored 3 junior developers through code reviews, pair programming sessions, and technical guidance
+• Collaborated with product and design teams to optimize user experience and implement new features
+
+Software Engineer | DataSolutions Corp | May 2017 - Dec 2019
+• Developed RESTful APIs using Node.js and Express to support mobile and web clients
+• Optimized database queries resulting in 40% performance improvement for critical user journeys
+• Implemented automated testing strategy that increased code coverage from 65% to 92%
+• Contributed to migration from monolith to microservices architecture
+• Built internal tools to streamline development workflow, saving 10+ hours per sprint
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of California, Berkeley
+Graduated with honors, 2016
+
+PROJECTS
+Open-source Contribution
+• Contributed to several open-source React libraries, including fixes for accessibility issues
+• Developed and maintained a popular npm package for React form validation with 50K+ downloads
+
+Personal Website and Blog
+• Designed and built a personal website using Next.js and Tailwind CSS
+• Write technical articles on web development best practices and emerging technologies
+
+CERTIFICATIONS
+• AWS Certified Developer - Associate
+• MongoDB Certified Developer
+• Microsoft Certified: Azure Developer Associate
+`;
+
+            // Event listener for sample resume button
+            useSampleBtn.addEventListener('click', async function() {
+                // Clear previous results
+                clearResults();
+                
+                // Get API key
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    showError('Please enter your OpenAI API key');
+                    return;
+                }
+                
+                // Display the sample resume text
+                resumeTextDiv.textContent = sampleResumeText;
+                extractedTextSection.style.display = 'block';
+                
+                // Add file size info
+                const characterCount = sampleResumeText.length;
+                const fileSizeInfo = document.createElement('p');
+                fileSizeInfo.innerHTML = `<small>Resume size: ${characterCount} characters (approximately ${Math.round(characterCount/4)} tokens)</small>`;
+                resumeTextDiv.parentNode.insertBefore(fileSizeInfo, resumeTextDiv.nextSibling);
+                
+                // Show loader
+                loader.style.display = 'block';
+                errorMessage.style.display = 'none';
+                
+                try {
+                    // Analyze the resume using OpenAI API
+                    const analysisResults = await analyzeResume(sampleResumeText, apiKey);
+                    
+                    // Display results
+                    displayResults(analysisResults);
+                } catch (error) {
+                    showError(error.message || 'An error occurred during analysis');
+                    console.error("Error:", error);
+                } finally {
+                    loader.style.display = 'none';
+                }
+            });
+            
+            // Event listener for file input to show file type
+            resumeFileInput.addEventListener('change', function() {
+                const fileTypeIndicator = document.getElementById('fileTypeIndicator');
+                
+                if (this.files && this.files[0]) {
+                    const fileName = this.files[0].name;
+                    const fileExtension = fileName.split('.').pop().toLowerCase();
+                    
+                    if (fileExtension === 'docx') {
+                        fileTypeIndicator.innerHTML = '<span class="file-type-badge docx">DOCX</span>';
+                    } else if (fileExtension === 'txt') {
+                        fileTypeIndicator.innerHTML = '<span class="file-type-badge txt">TXT</span>';
+                    } else {
+                        fileTypeIndicator.innerHTML = '';
+                    }
+                } else {
+                    fileTypeIndicator.innerHTML = '';
+                }
+            });
+            
+            // Event listener for analyze button
+            analyzeBtn.addEventListener('click', async function() {
+                const apiKey = apiKeyInput.value.trim();
+                const file = resumeFileInput.files[0];
+                
+                // Basic validation
+                if (!apiKey) {
+                    showError('Please enter your OpenAI API key');
+                    return;
+                }
+                
+                if (!file) {
+                    showError('Please upload a resume file');
+                    return;
+                }
+                
+                // Clear previous results
+                clearResults();
+                
+                // Show loader
+                loader.style.display = 'block';
+                errorMessage.style.display = 'none';
+                
+                try {
+                    // Read the file and extract text
+                    const text = await extractTextFromFile(file);
+                    
+                    // Add file size info
+                    const characterCount = text.length;
+                    const fileSizeInfo = document.createElement('p');
+                    fileSizeInfo.innerHTML = `<small>Resume size: ${characterCount} characters (approximately ${Math.round(characterCount/4)} tokens)</small>`;
+                    if (characterCount > 6000) {
+                        fileSizeInfo.innerHTML += `<br><small class="warning" style="color: #e74c3c;">⚠️ Large resume detected. The analysis will be based on the first 6000 characters only.</small>`;
+                    }
+                    resumeTextDiv.parentNode.insertBefore(fileSizeInfo, resumeTextDiv.nextSibling);
+                    
+                    // Display the extracted text
+                    resumeTextDiv.textContent = text;
+                    extractedTextSection.style.display = 'block';
+                    
+                    try {
+                        // Analyze the resume using OpenAI API
+                        const analysisResults = await analyzeResume(text, apiKey);
+                        
+                        // Display results
+                        displayResults(analysisResults);
+                    } catch (apiError) {
+                        // If the first attempt fails, try with a more aggressive truncation
+                        console.error("First API attempt failed:", apiError);
+                        showError(`API Error: ${apiError.message}. Retrying with shorter content...`);
+                        
+                        // Cut the resume even shorter for the second attempt
+                        const shorterText = text.substring(0, 4000);
+                        const analysisResults = await analyzeResume(shorterText, apiKey);
+                        
+                        // Display results from the second attempt
+                        displayResults(analysisResults);
+                    }
+                    
+                } catch (error) {
+                    showError(error.message || 'An error occurred during analysis');
+                    console.error("Final error:", error);
+                } finally {
+                    loader.style.display = 'none';
+                }
+            });
+            
+            // Function to extract text from uploaded file
+            async function extractTextFromFile(file) {
+                return new Promise((resolve, reject) => {
+                    // Check file type
+                    const fileType = file.name.split('.').pop().toLowerCase();
+                    
+                    if (fileType === 'docx') {
+                        // Handle DOCX files using mammoth.js
+                        const reader = new FileReader();
+                        
+                        reader.onload = function(event) {
+                            const arrayBuffer = event.target.result;
+                            
+                            // Use mammoth to convert the docx to HTML, then extract text
+                            mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                                .then(result => {
+                                    const text = result.value;
+                                    
+                                    // Check if we got meaningful text
+                                    if (text && text.length > 100) {
+                                        resolve(text);
+                                    } else {
+                                        showError('Could not extract sufficient text from the Word document. Using sample resume for demonstration.');
+                                        resolve(sampleResumeText);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error("Mammoth error:", error);
+                                    showError('Error processing Word document. Using sample resume for demonstration.');
+                                    resolve(sampleResumeText);
+                                });
+                        };
+                        
+                        reader.onerror = function() {
+                            showError('Error reading the Word document. Using sample resume for demonstration.');
+                            resolve(sampleResumeText);
+                        };
+                        
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        // Handle TXT files
+                        const reader = new FileReader();
+                        
+                        reader.onload = function(event) {
+                            try {
+                                let text = event.target.result;
+                                
+                                // Check if the text appears to be binary/corrupted
+                                const nonPrintableCharsRatio = (text.match(/[^\x20-\x7E\t\n\r]/g) || []).length / text.length;
+                                
+                                if (nonPrintableCharsRatio > 0.3) {
+                                    // Text is likely binary/corrupted
+                                    showError('The file appears to be in a binary or unsupported format. Using sample resume for demonstration.');
+                                    resolve(sampleResumeText);
+                                } else {
+                                    resolve(text);
+                                }
+                            } catch (error) {
+                                console.error("Text extraction error:", error);
+                                showError('Could not extract text from the file. Using sample resume for demonstration.');
+                                resolve(sampleResumeText);
+                            }
+                        };
+                        
+                        reader.onerror = function() {
+                            showError('Error reading the file. Using sample resume for demonstration.');
+                            resolve(sampleResumeText);
+                        };
+                        
+                        reader.readAsText(file);
+                    }
+                });
+            }
+            
+            // Function to analyze resume using OpenAI API
+            async function analyzeResume(resumeText, apiKey) {
+                // Display character count to help user understand size constraints
+                const charCount = resumeText.length;
+                console.log(`Resume character count: ${charCount}`);
+                
+                // If the resume is too large, truncate it and add a note
+                const MAX_LENGTH = 6000; // Approximately 1500 tokens for GPT-3.5-turbo
+                let truncatedText = resumeText;
+                let truncationNote = "";
+                
+                if (charCount > MAX_LENGTH) {
+                    truncatedText = resumeText.substring(0, MAX_LENGTH);
+                    truncationNote = "\n\n[Note: This resume was truncated due to size limitations. Analysis is based on the first part of the resume only.]";
+                    showError(`Resume is large (${charCount} characters). Analysis will be based on the first ${MAX_LENGTH} characters only.`);
+                }
+                
+                try {
+                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-3.5-turbo", // Using GPT-3.5-turbo which has higher rate limits
+                            messages: [
+                                {
+                                    role: "system",
+                                    content: "You are an expert HR assistant tasked with analyzing resumes. Extract information strictly from the provided resume. Do not invent or assume information not explicitly stated."
+                                },
+                                {
+                                    role: "user",
+                                    content: `Analyze the following resume text and provide: 
+                                    1. A brief professional summary of the candidate (100 words max)
+                                    2. 5 key highlights from their experience and qualifications
+                                    3. 10-15 important skills and keywords from the resume
+                                    4. 5 specific interview questions based only on the resume content
+                                    
+                                    Format the response as JSON with the following structure:
+                                    {
+                                      "summary": "Candidate summary here",
+                                      "highlights": ["Highlight 1", "Highlight 2", ...],
+                                      "keywords": ["Keyword/Skill 1", "Keyword/Skill 2", ...],
+                                      "questions": ["Question 1?", "Question 2?", ...]
+                                    }
+                                    
+                                    Resume text:
+                                    ${truncatedText}${truncationNote}`
+                                }
+                            ]
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`OpenAI API Error: ${errorData.error?.message || 'Unknown error'}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    try {
+                        // Parse the content as JSON
+                        return JSON.parse(data.choices[0].message.content);
+                    } catch (error) {
+                        // If JSON parsing fails, try to extract JSON from the response
+                        const content = data.choices[0].message.content;
+                        const jsonMatch = content.match(/\{[\s\S]*\}/);
+                        
+                        if (jsonMatch) {
+                            return JSON.parse(jsonMatch[0]);
+                        } else {
+                            // If we can't extract JSON, create a structured response manually
+                            console.error("Failed to parse JSON from response:", content);
+                            return {
+                                summary: "Could not generate proper summary due to parsing issues.",
+                                highlights: ["The API response couldn't be properly parsed. Please try again."],
+                                keywords: ["Error", "Parsing Issue"],
+                                questions: ["Please try again with a different resume or check API settings."]
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.error("API request error:", error);
+                    throw new Error(`OpenAI API Error: ${error.message || 'Unknown error'}`);
+                }
+            }
+            
+            // Function to display the analysis results
+            function displayResults(data) {
+                // Display candidate summary
+                candidateSummaryEl.textContent = data.summary;
+                
+                // Display highlights
+                highlightsEl.innerHTML = '';
+                data.highlights.forEach(highlight => {
+                    const div = document.createElement('div');
+                    div.className = 'highlight';
+                    div.textContent = highlight;
+                    highlightsEl.appendChild(div);
+                });
+                
+                // Display keywords
+                keywordsEl.innerHTML = '';
+                data.keywords.forEach(keyword => {
+                    const span = document.createElement('span');
+                    span.className = 'tag';
+                    span.textContent = keyword;
+                    keywordsEl.appendChild(span);
+                });
+                
+                // Display questions
+                questionsEl.innerHTML = '';
+                data.questions.forEach(question => {
+                    const div = document.createElement('div');
+                    div.className = 'question';
+                    div.textContent = question;
+                    questionsEl.appendChild(div);
+                });
+                
+                // Show results section
+                analysisResults.style.display = 'block';
+            }
+            
+            // Function to clear previous results
+            function clearResults() {
+                candidateSummaryEl.textContent = '';
+                highlightsEl.innerHTML = '';
+                keywordsEl.innerHTML = '';
+                questionsEl.innerHTML = '';
+                analysisResults.style.display = 'none';
+                extractedTextSection.style.display = 'none';
+                resumeTextDiv.textContent = '';
+            }
+            
+            // Function to show error messages
+            function showError(message) {
+                // Don't hide the loader if it's a warning about resume size
+                if (!message.includes("Large resume detected") && !message.includes("Resume is large")) {
+                    loader.style.display = 'none';
+                }
+                
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                
+                // Make it disappear after 10 seconds if it's just a warning
+                if (message.includes("Large resume") || message.includes("Retrying with shorter")) {
+                    setTimeout(() => {
+                        if (errorMessage.textContent === message) {
+                            errorMessage.style.display = 'none';
+                        }
+                    }, 10000);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
